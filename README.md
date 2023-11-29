@@ -61,6 +61,11 @@ Some examples from our YOLACT base model (33.5 fps on a Titan Xp and 29.8 mAP on
    python setup.py build develop
    ```
 
+## Version
+```
+pip3 uninstall torch torchvision
+pip3 install torch==1.4.0 torchvision==0.5.0
+```
 
 # Evaluation
 Here are our YOLACT models (released on April 5th, 2019) along with their FPS on a Titan Xp and mAP on `test-dev`:
@@ -156,6 +161,16 @@ python train.py --config=yolact_base_config --resume=weights/yolact_base_10_3210
 
 # Use the help option to see a description of all available command line arguments
 python train.py --help
+```
+
+### avoidance memory outage
+```
+--top_k=15 --score_threshold=0.15
+```
+
+### worked environment
+```
+GeForce GTX 1080 Ti x 2
 ```
 
 ## Multi-GPU Support

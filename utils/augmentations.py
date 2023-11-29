@@ -9,6 +9,22 @@ from math import sqrt
 from data import cfg, MEANS, STD
 
 
+def show_float32(image_float32):
+    image_uint8 = image_float32.astype(np.uint8)
+    cv2.imshow('image', image_uint8)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    
+def show_bboxes(image_float32, bboxes):
+    image_uint8 = image_float32.astype(np.uint8)
+    for bbox in bboxes:
+        x1, y1, x2, y2 = bbox
+        cv2.rectangle(image_uint8, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+    cv2.imshow('image', image_uint8)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+    
+    
 def intersect(box_a, box_b):
     max_xy = np.minimum(box_a[:, 2:], box_b[2:])
     min_xy = np.maximum(box_a[:, :2], box_b[:2])
@@ -306,7 +322,14 @@ class RandomSampleCrop(object):
         height, width, _ = image.shape
         while True:
             # randomly choose a mode
-            mode = random.choice(self.sample_options)
+            # mode = random.choice(self.sample_options)
+            def custom_choice(sample_options):
+                index = random.randint(len(sample_options))
+                if index != 0:
+                    return sample_options[index]
+                else:
+                    return (None, None)
+            mode = custom_choice(self.sample_options)
             if mode is None:
                 return image, masks, boxes, labels
 

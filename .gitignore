@@ -158,3 +158,6 @@ vid/
 vidres/
 
 _.py
+*jpg*
+*annotations*
+data/grape_labels.txt

@@ -32,50 +32,72 @@ parser = argparse.ArgumentParser(
     description='Yolact Training Script')
 parser.add_argument('--batch_size', default=8, type=int,
                     help='Batch size for training')
+# トレーニングを再開するためのチェックポイントのstate_dict fileを指定, interupptの場合は中断ファイルからトレーニングを再開
 parser.add_argument('--resume', default=None, type=str,
                     help='Checkpoint state_dict file to resume training from. If this is "interrupt"'\
                          ', the model will resume training from the interrupt file.')
+# 指定したイテレーションからトレーニングを再開
 parser.add_argument('--start_iter', default=-1, type=int,
                     help='Resume training at this iter. If this is -1, the iteration will be'\
                          'determined from the file name.')
+# データローダーのワーカー数
 parser.add_argument('--num_workers', default=4, type=int,
                     help='Number of workers used in dataloading')
+# CUDAを使用するかどうか
 parser.add_argument('--cuda', default=True, type=str2bool,
                     help='Use CUDA to train model')
+# 初期学習率の指定
 parser.add_argument('--lr', '--learning_rate', default=None, type=float,
                     help='Initial learning rate. Leave as None to read this from the config.')
+# SGDのモーメンタム
 parser.add_argument('--momentum', default=None, type=float,
                     help='Momentum for SGD. Leave as None to read this from the config.')
+# SGDの重み減衰
 parser.add_argument('--decay', '--weight_decay', default=None, type=float,
                     help='Weight decay for SGD. Leave as None to read this from the config.')
+# 学習率のステップ, 各ステップで学習率を減衰させる
 parser.add_argument('--gamma', default=None, type=float,
                     help='For each lr step, what to multiply the lr by. Leave as None to read this from the config.')
+# チェックポイントを保存するフォルダ
 parser.add_argument('--save_folder', default='weights/',
                     help='Directory for saving checkpoint models.')
+# logを保存するフォルダ
 parser.add_argument('--log_folder', default='logs/',
                     help='Directory for saving logs.')
+# 使用する設定ファイル
 parser.add_argument('--config', default=None,
                     help='The config object to use.')
+# モデルを保存する間のイテレーション数
 parser.add_argument('--save_interval', default=10000, type=int,
                     help='The number of iterations between saving the model.')
+# 検証に使用する画像の数
 parser.add_argument('--validation_size', default=5000, type=int,
                     help='The number of images to use for validation.')
+# Nイテレーションごとに検証を出力
 parser.add_argument('--validation_epoch', default=2, type=int,
                     help='Output validation information every n iterations. If -1, do no validation.')
+# 最新のチェックポイントのみを保存するかどうか
 parser.add_argument('--keep_latest', dest='keep_latest', action='store_true',
                     help='Only keep the latest checkpoint instead of each one.')
+# ONの場合, 最新のチェックポイントを削除しない
 parser.add_argument('--keep_latest_interval', default=100000, type=int,
                     help='When --keep_latest is on, don\'t delete the latest file at these intervals. This should be a multiple of save_interval or 0.')
+# 設定で指定したデータセットを上書きする場合に使用
 parser.add_argument('--dataset', default=None, type=str,
                     help='If specified, override the dataset specified in the config with this one (example: coco2017_dataset).')
+# イテレーション情報をlogに保存しないようにする
 parser.add_argument('--no_log', dest='log', action='store_false',
                     help='Don\'t log per iteration information into log_folder.')
+# ログにGPU情報を含めるかどうか
 parser.add_argument('--log_gpu', dest='log_gpu', action='store_true',
                     help='Include GPU information in the logs. Nvidia-smi tends to be slow, so set this with caution.')
+# KeyboardInterruptが発生したときに中断ファイルを保存しないようにする
 parser.add_argument('--no_interrupt', dest='interrupt', action='store_false',
                     help='Don\'t save an interrupt when KeyboardInterrupt is caught.')
+# 複数のGPUを使用する場合, ローカルバッチサイズを指定する
 parser.add_argument('--batch_alloc', default=None, type=str,
                     help='If using multiple GPUS, you can set this to be a comma separated list detailing which GPUs should get what local batch size (It should add up to your total batch size).')
+# デフォルトでバッチサイズに応じてlrとイテレーション数を自動的にスケーリングするが, これを無効にするかどうか
 parser.add_argument('--no_autoscale', dest='autoscale', action='store_false',
                     help='YOLACT will automatically scale the lr and the number of iterations depending on the batch size. Set this if you want to disable that.')
 
@@ -88,6 +110,7 @@ if args.config is not None:
 if args.dataset is not None:
     set_dataset(args.dataset)
 
+# autoscale = True ∩ batch_size = 8 ならば, lrとイテレーション数をバッチサイズの比率に応じてスケーリングする
 if args.autoscale and args.batch_size != 8:
     factor = args.batch_size / 8
     if __name__ == '__main__':
@@ -97,7 +120,7 @@ if args.autoscale and args.batch_size != 8:
     cfg.max_iter //= factor
     cfg.lr_steps = [x // factor for x in cfg.lr_steps]
 
-# Update training parameters from the config if necessary
+# 引数にない場合, 設定ファイルから読み込む
 def replace(name):
     if getattr(args, name) == None: setattr(args, name, getattr(cfg, name))
 replace('lr')
@@ -108,16 +131,20 @@ replace('momentum')
 # This is managed by set_lr
 cur_lr = args.lr
 
-if torch.cuda.device_count() == 0:
+# cudaが使用可能でない場合エラー終了
+if args.cuda and torch.cuda.device_count() == 0:
     print('No GPUs detected. Exiting...')
     exit(-1)
 
-if args.batch_size // torch.cuda.device_count() < 6:
+# バッチサイズがcudaデバイス数より小さい場合, バッチ正規化を無効にする
+if (args.cuda) and (args.batch_size // torch.cuda.device_count() < 6):
     if __name__ == '__main__':
         print('Per-GPU batch size is less than the recommended limit for batch norm. Disabling batch norm.')
     cfg.freeze_bn = True
 
+# 損失関数の種類を表す
 loss_types = ['B', 'C', 'M', 'P', 'D', 'E', 'S', 'I']
+
 
 if torch.cuda.is_available():
     if args.cuda:
@@ -129,10 +156,13 @@ if torch.cuda.is_available():
 else:
     torch.set_default_tensor_type('torch.FloatTensor')
 
+
 class NetLoss(nn.Module):
     """
     A wrapper for running the network and computing the loss
     This is so we can more efficiently use DataParallel.
+    networkを実行して損失関数を計算するためのラッパー
+    DataParallelをより効率的に使用できるようにするため
     """
     
     def __init__(self, net:Yolact, criterion:MultiBoxLoss):
@@ -150,6 +180,8 @@ class CustomDataParallel(nn.DataParallel):
     """
     This is a custom version of DataParallel that works better with our training data.
     It should also be faster than the general case.
+    訓練データとよりよく動作するカスタムDataParallel
+    一般的なケースよりも高速に動作するはず
     """
 
     def scatter(self, inputs, kwargs, device_ids):
@@ -170,6 +202,21 @@ class CustomDataParallel(nn.DataParallel):
         return out
 
 def train():
+    """
+    以下の手順を実行
+    1. args.save_folderが存在しない場合, 作成する
+    2. COCODetectionを使用してデータセットを読み込む
+    3. args.validation_epoch > 0の場合, 検証用のデータセットを読み込む
+    4. Yolactを初期化し、訓練モードにする
+    5. ログの設定
+    6. timerを無効化し、訓練中に使用するタイミングメソッドを変更する
+    7. args.resumeが'interrupt'または'latest'の場合, それに応じて訓練を再開
+    8. 上記以外の場合は重みを初期化
+    9. SGDを初期化し、損失関数をMultiBoxLossに設定
+    10. args.batch_allocがNoneでない場合, args.batch_allocをカンマで区切ってリストに変換し、バッチの割り当てを行う
+    11. CustomDataParallelを使用してモデルを並列化し, CUDAを使用する場合はGPUに転送する
+    12.
+    """
     if not os.path.exists(args.save_folder):
         os.mkdir(args.save_folder)
 
@@ -231,7 +278,12 @@ def train():
     
     # Initialize everything
     if not cfg.freeze_bn: yolact_net.freeze_bn() # Freeze bn so we don't kill our means
-    yolact_net(torch.zeros(1, 3, cfg.max_size, cfg.max_size).cuda())
+
+    if args.cuda:
+        yolact_net(torch.zeros(1, 3, cfg.max_size, cfg.max_size).cuda())
+    else:
+        yolact_net(torch.zeros(1, 3, cfg.max_size, cfg.max_size))
+
     if not cfg.freeze_bn: yolact_net.freeze_bn(True)
 
     # loss counters
@@ -304,6 +356,9 @@ def train():
                 optimizer.zero_grad()
 
                 # Forward Pass + Compute loss at the same time (see CustomDataParallel and NetLoss)
+                # TODO:NetLossで3つの引数が必要だが実際は提供されていなくエラーを吐く
+                # len(datum)=2となっており, 3つの引数を提供するためにはどうすれば良いのか
+                # images, targets = datum?
                 losses = net(datum)
                 
                 losses = { k: (v).mean() for k,v in losses.items() } # Mean here because Dataparallel
