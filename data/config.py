@@ -808,10 +808,10 @@ yolact_plus_resnet50_config = yolact_plus_base_config.copy({
 grape_dataset = dataset_base.copy(
     {
         'name': 'grape',
-        'train_images': './data/grape20211124',
-        'valid_images': './data/grape20211125',
-        'train_info': './data/grape20211124/annotations.json',
-        'valid_info': './data/grape20211125/annotations.json',
+        'train_images': './data/20231130',
+        'valid_images': './data/20231130',
+        'train_info': './data/20231130/annotations.json',
+        'valid_info': './data/20231130/annotations.json',
         'class_names': ('berry', 'rachis'),
         'label_map': {1: 1, 2: 2},
     }
@@ -822,7 +822,7 @@ yolact_grape_config = coco_base_config.copy(
         'name': 'yolact_grape',
         'dataset': grape_dataset,
         'num_classes': len(grape_dataset.class_names) + 1,
-        'max_size': 1280,
+        'max_size': 640,
         'lr_steps': (280000, 600000, 700000, 750000),
         'max_iter': 20000,
         'backbone': resnet101_backbone.copy(

@@ -8,7 +8,6 @@ __pycache__/
 
 # Distribution / packaging
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -161,3 +160,10 @@ _.py
 *jpg*
 *annotations*
 data/grape_labels.txt
+
+.*
+
+data/*/*.json
+data/classes.txt
+data/*/classes.txt
+*.tar*
